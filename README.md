@@ -1,54 +1,54 @@
 # hermes-quota-live
 
-Panel de **cuota real** dentro del desktop de Hermes, alimentado por las APIs oficiales
-de los proveedores que ya usa Hermes.
+A **real quota** panel inside the Hermes desktop app, fed by the official APIs of the
+providers Hermes already uses.
 
-![Detalle de la vista Usado](docs/screenshots/vista-usado.png)
+![Used-view detail](docs/screenshots/vista-usado.png)
 
-## Qué muestra
+## What it shows
 
-| Proveedor | Fuente |
+| Provider | Source |
 |---|---|
-| OpenCode Go | `/zen/go/v1/usage` + `/console/api/go/status` → ventanas 5 h / 7 d / 30 d en USD |
-| OpenRouter | `/api/v1/key` → presupuestos y requests diarios de modelos free |
-| GitHub Copilot | `/copilot_internal/user` → créditos de chat y completions |
-| Z.ai GLM | `/api/monitor/usage/quota/limit` → sólo con Coding Plan |
-| Uso local | `~/.hermes/state.db` en solo lectura → analítica y modelos |
+| OpenCode Go | `/zen/go/v1/usage` + `/console/api/go/status` → 5 h / 7 d / 30 d windows in USD |
+| OpenRouter | `/api/v1/key` → budgets and daily requests for free models |
+| GitHub Copilot | `/copilot_internal/user` → chat and completions credits |
+| Z.ai GLM | `/api/monitor/usage/quota/limit` → only with a Coding Plan |
+| Local usage | `~/.hermes/state.db`, read-only → analytics and models |
 
-NVIDIA no expone API de cuota; no se inventan ventanas para ningún proveedor.
+NVIDIA does not expose a quota API; no provider gets invented windows.
 
-## Estructura
+## Layout
 
 ```
-plugin.yaml              # manifiesto del plugin de Hermes
-__init__.py              # entrypoint del lado agente
-dashboard/               # backend HTTP montado en /api/plugins/hermes-quota-live
+plugin.yaml              # Hermes plugin manifest
+__init__.py              # agent-side entrypoint
+dashboard/               # HTTP backend mounted at /api/plugins/hermes-quota-live
   manifest.json
   plugin_api.py
   quota_adapters.py
-desktop/plugin.js        # pane, pestañas y chip del desktop (SDK de plugins)
-docs/                    # guía de instalación, proveedores y catálogo
+desktop/plugin.js        # desktop pane, tabs and status chip (plugin SDK)
+docs/                    # setup, providers and catalog notes
 scripts/                 # install.sh / verify.sh
-tests/                   # 15 tests, sin secretos ni HTTP real
+tests/                   # 15 tests, no secrets and no live HTTP
 ```
 
-## Arranque rápido
+## Quick start
 
-Ver [docs/SETUP.md](docs/SETUP.md). En corto:
+See [docs/SETUP.md](docs/SETUP.md). In short:
 
 ```sh
 ./scripts/install.sh
 # ⌘K → Reload desktop plugins
 ```
 
-El chip `Uso N%` aparece en la barra de estado; clickealo para abrir el panel.
-El porcentaje arranca en vista **Usado** y se puede cambiar a **Libre** desde el encabezado.
+The `Uso N%` chip appears in the status bar; click it to open the panel.
+Percentages default to the **Used** view and can be switched to **Free** from the header.
 
-## Privacidad
+## Privacy
 
-Las credenciales se resuelven en memoria desde el store de Hermes (`agent.secret_scope`)
-y viajan únicamente al host oficial de cada proveedor. No se imprimen, no se persisten
-y no se envían a terceros. El panel no tiene telemetría propia.
+Credentials are resolved in memory from the Hermes store (`agent.secret_scope`) and sent
+only to each provider's official host. They are never printed, persisted, or shared with
+third parties. The panel has no telemetry of its own.
 
 ## Tests
 
@@ -56,6 +56,6 @@ y no se envían a terceros. El panel no tiene telemetría propia.
 ./scripts/verify.sh
 ```
 
-## Licencia
+## License
 
-MIT. Ver [LICENSE](LICENSE) y [NOTICE.md](NOTICE.md) por la atribución de la UI original.
+MIT. See [LICENSE](LICENSE) and [NOTICE.md](NOTICE.md) for attribution of the original UI.
