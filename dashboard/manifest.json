@@ -1,0 +1,10 @@
+{
+  "name": "hermes-quota-live",
+  "label": "Hermes Quota Live",
+  "description": "Direct provider quota (OpenCode Go, OpenRouter, GitHub Copilot, Z.ai) inside Hermes Desktop, with Hermes local usage fallback.",
+  "version": "0.1.0",
+  "tab": { "path": "/hermes-quota-live", "position": "end", "hidden": true },
+  "slots": [],
+  "entry": "dist/index.js",
+  "api": "plugin_api.py"
+}
