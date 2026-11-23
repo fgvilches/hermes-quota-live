@@ -1,4 +1,4 @@
-# DRAFT — no enviado. Revisar antes de abrir el PR a hermes-agent.
+# Submitted: https://github.com/NousResearch/hermes-agent/pull/159051
 # El sha fija el commit publicado; cualquier cambio de código requiere un SHA nuevo.
 name: hermes-quota-live
 repo: https://github.com/fgvilches/hermes-quota-live

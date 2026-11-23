@@ -27,7 +27,7 @@ que se consultan.
 
 ## Estado actual
 
-El repo público es https://github.com/fgvilches/hermes-quota-live y el borrador del entry está en `docs/catalog-entry.yaml`, fijado al commit `ccda7f7bfcd81d35a333882b841ea343c7e9f0e2`. **No se abrió ningún PR**; se deja para revisión.
+El repo público es https://github.com/fgvilches/hermes-quota-live y el borrador del entry está en `docs/catalog-entry.yaml`, fijado al commit `ccda7f7bfcd81d35a333882b841ea343c7e9f0e2`. PR abierto: https://github.com/NousResearch/hermes-agent/pull/159051 (pendiente de revisión de un maintainer).
 
 Regla 11 resuelta: el backend declara `requires_env` en `plugin.yaml` y resuelve las credenciales únicamente con `agent.secret_scope.get_secret()`. No lee `auth.json`, `.env` ni el login de otras CLI.
 
