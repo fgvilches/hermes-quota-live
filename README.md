@@ -2,11 +2,10 @@
 
 Panel de **cuota real** dentro del desktop de Hermes, alimentado por las APIs oficiales
 de los proveedores que ya usa Hermes.
-![Panel Quota & Usage](docs/screenshots/panel-cuota.png)
 
 ![Detalle de la vista Usado](docs/screenshots/vista-usado.png)
 
-## qué muestra
+## Qué muestra
 
 | Proveedor | Fuente |
 |---|---|
@@ -18,7 +17,7 @@ de los proveedores que ya usa Hermes.
 
 NVIDIA no expone API de cuota; no se inventan ventanas para ningún proveedor.
 
-## estructura
+## Estructura
 
 ```
 plugin.yaml              # manifiesto del plugin de Hermes
@@ -33,7 +32,7 @@ scripts/                 # install.sh / verify.sh
 tests/                   # 15 tests, sin secretos ni HTTP real
 ```
 
-## arranque rápido
+## Arranque rápido
 
 Ver [docs/SETUP.md](docs/SETUP.md). En corto:
 
@@ -45,18 +44,18 @@ Ver [docs/SETUP.md](docs/SETUP.md). En corto:
 El chip `Uso N%` aparece en la barra de estado; clickealo para abrir el panel.
 El porcentaje arranca en vista **Usado** y se puede cambiar a **Libre** desde el encabezado.
 
-## privacidad
+## Privacidad
 
 Las credenciales se resuelven en memoria desde el store de Hermes (`agent.secret_scope`)
 y viajan únicamente al host oficial de cada proveedor. No se imprimen, no se persisten
 y no se envían a terceros. El panel no tiene telemetría propia.
 
-## tests
+## Tests
 
 ```sh
 ./scripts/verify.sh
 ```
 
-## licencia
+## Licencia
 
 MIT. Ver [LICENSE](LICENSE) y [NOTICE.md](NOTICE.md) por la atribución de la UI original.
