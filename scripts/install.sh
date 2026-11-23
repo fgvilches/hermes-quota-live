@@ -12,7 +12,7 @@ echo "Installing $ID from $REPO"
 
 mkdir -p "$BACKEND/dashboard" "$DESKTOP"
 cp "$REPO/plugin.yaml" "$REPO/__init__.py" "$BACKEND/"
-cp "$REPO"/dashboard/* "$BACKEND/dashboard/"
+cp "$REPO"/dashboard/*.json "$REPO"/dashboard/*.py "$BACKEND/dashboard/"
 cp "$REPO/desktop/plugin.js" "$DESKTOP/plugin.js"
 
 if command -v hermes >/dev/null 2>&1; then
