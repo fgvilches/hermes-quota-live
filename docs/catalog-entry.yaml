@@ -5,7 +5,7 @@ repo: https://github.com/fgvilches/hermes-quota-live
 sha: "<SHA_DEL_COMMIT_PUBLICADO>"  # completar al hacer el PR
 subdir: ""
 title: "Hermes Quota Live"
-description: "Cuota de OpenCode Go, OpenRouter y Copilot dentro del desktop de Hermes, sin OpenCode Desktop."
+description: "Real provider quota (OpenCode Go, OpenRouter, Copilot) inside the Hermes desktop app."
 maintainer: "Felipe González"
 tier: community
 category: desktop
@@ -21,10 +21,13 @@ platforms: []
 onboarding: false
 default: false
 known_issues:
-  - "Bloqueante de catálogo: el backend lee ~/.hermes/auth.json para resolver punteros de credencial y usa `gh auth token` para Copilot; la regla 11 exige declarar requires_env y usar agent.secret_scope.get_secret. Refactorizar antes de submittear."
-  - "La UI del panel está en español; agregar bundle en antes de una submissioncurada por maintainers."
+  - "The panel UI is Spanish; an English i18n bundle is planned."
 capabilities:
   provides_tools: []
   provides_hooks: []
   provides_middleware: []
-  requires_env: []
+  requires_env:
+    - GITHUB_TOKEN
+    - GLM_API_KEY
+    - OPENCODE_GO_API_KEY
+    - OPENROUTER_API_KEY

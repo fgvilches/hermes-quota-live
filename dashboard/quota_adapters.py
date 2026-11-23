@@ -1,21 +1,19 @@
 """Direct provider quota adapters for the Hermes quota panel.
 
-Reads only the credentials Hermes already stores (env pointers / gh CLI), calls
-each provider's official HTTPS API, and maps the answer to the panel's card
-contract. No secret is logged, persisted, or sent to a third party.
+Credentials are resolved exclusively through Hermes' secret resolver for the
+variables declared in plugin.yaml (requires_env). No credential-store files,
+.env files, or another tool's login are ever read. Each provider's official
+HTTPS API is called and the answer is mapped to the panel's card contract.
+No secret is logged, persisted, or sent to a third party.
 """
 
 from __future__ import annotations
 
 import json
-import os
-import re
-import subprocess
 import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
 
 try:  # canonical, profile-aware secret resolver in the Hermes runtime
@@ -36,8 +34,12 @@ USER_AGENT = "hermes-quota/1.0"
 Opener = Callable[..., Any]
 
 
-def _home() -> Path:
-    return Path(os.environ.get("HERMES_HOME") or (Path.home() / ".hermes"))
+CREDENTIAL_ENV = {
+    "opencode-go": "OPENCODE_GO_API_KEY",
+    "openrouter": "OPENROUTER_API_KEY",
+    "copilot": "GH_TOKEN",
+    "zai": "GLM_API_KEY",
+}
 
 
 def _text(value: Any) -> Optional[str]:
@@ -60,79 +62,30 @@ def _num(value: Any) -> Optional[float]:
     return None
 
 
-def _dotenv() -> Dict[str, str]:
-    result: Dict[str, str] = {}
-    path = _home() / ".env"
-    if not path.is_file():
-        return result
-    try:
-        for line in path.read_text(encoding="utf-8", errors="ignore").splitlines():
-            match = re.match(r"^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$", line.strip())
-            if not match:
-                continue
-            value = match.group(2).strip()
-            if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
-                value = value[1:-1]
-            result[match.group(1)] = value
-    except OSError:
-        pass
-    return result
-
-
 def _secret(name: str) -> Optional[str]:
-    if _runtime_get_secret is not None:
-        try:
-            value = _runtime_get_secret(name)
-            if value:
-                return str(value)
-        except Exception:
-            pass
-    return os.environ.get(name) or _dotenv().get(name)
-
-
-def _gh_token() -> Optional[str]:
+    """Resolve a declared variable through Hermes, never from files."""
+    if _runtime_get_secret is None:
+        return None
     try:
-        done = subprocess.run(
-            ["gh", "auth", "token"], capture_output=True, text=True, timeout=5
-        )
+        value = _runtime_get_secret(name)
     except Exception:
         return None
-    return done.stdout.strip() if done.returncode == 0 else None
-
-
-def _pool() -> Dict[str, Any]:
-    try:
-        return json.loads((_home() / "auth.json").read_text(encoding="utf-8")).get(
-            "credential_pool", {}
-        )
-    except (OSError, ValueError):
-        return {}
+    return str(value) if value else None
 
 
 def credential(provider: str) -> Optional[str]:
-    """Resolve the credential pointer without ever exposing its value."""
-    for entry in _pool().get(provider) or []:
-        if not isinstance(entry, Mapping):
-            continue
-        source = str(entry.get("source") or "")
-        if source.startswith("env:"):
-            return _secret(source.split(":", 1)[1].strip())
-        if source == "gh_cli":
-            return _gh_token()
-    return None
+    name = CREDENTIAL_ENV.get(provider)
+    if not name:
+        return None
+    value = _secret(name)
+    if provider == "copilot" and not value:
+        value = _secret("GITHUB_TOKEN")
+    return value
 
 
 def _workspace_id() -> Optional[str]:
-    """OpenCode Go workspace id is not a secret and lives in auth.json metadata."""
-    for entries in _pool().values():
-        for entry in entries or []:
-            if not isinstance(entry, Mapping):
-                continue
-            message = str(entry.get("last_error_message") or "")
-            match = re.search(r"workspace['\"]?\s*:\s*['\"]?(wrk_[A-Za-z0-9_-]+)", message)
-            if match:
-                return match.group(1)
-    return None
+    """Optional OpenCode Go workspace id for the USD meters endpoint."""
+    return _secret("OPENCODE_WORKSPACE_ID")
 
 
 def _get_json(
@@ -213,7 +166,11 @@ def _iso_from_ms(value: Any) -> Optional[str]:
         return None
 
 
-def fetch_opencode_go(token: str, opener: Optional[Opener] = None) -> Dict[str, Any]:
+def fetch_opencode_go(
+    token: str, opener: Optional[Opener] = None, workspace: Optional[str] = None
+) -> Dict[str, Any]:
+    if workspace is None:  # direct calls (tests) resolve in the caller's context
+        workspace = _workspace_id()
     payload = _get_json(
         "https://opencode.ai/zen/go/v1/usage", token, opener=opener
     )
@@ -409,13 +366,18 @@ ADAPTERS = (
 
 
 def _run_adapter(
-    name: str, label: str, fetcher: Callable[..., Dict[str, Any]], opener: Optional[Opener]
+    name: str,
+    label: str,
+    fetcher: Callable[..., Dict[str, Any]],
+    token: str,
+    workspace: Optional[str],
+    opener: Optional[Opener],
 ) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
     try:
-        token = credential(name)
-        if not token:
-            return None, None
-        card = fetcher(token, opener=opener)
+        kwargs: Dict[str, Any] = {"opener": opener}
+        if name == "opencode-go":
+            kwargs["workspace"] = workspace
+        card = fetcher(token, **kwargs)
         if not card.get("windows") and not card.get("error"):
             return None, None
         return card, None
@@ -424,11 +386,26 @@ def _run_adapter(
 
 
 def collect_direct_cards(opener: Optional[Opener] = None) -> Tuple[List[Dict[str, Any]], List[str]]:
-    """Fetch every configured provider concurrently. Never raises to the caller."""
+    """Resolve secrets in this context, then fetch providers concurrently.
+
+    Hermes secret scopes are context-local: worker threads do not inherit them,
+    so every credential must be resolved BEFORE the executor starts.
+    """
+    prepared = []
     try:
-        with ThreadPoolExecutor(max_workers=len(ADAPTERS)) as pool:
+        for name, label, fetcher in ADAPTERS:
+            token = credential(name)
+            if not token:
+                continue
+            workspace = _workspace_id() if name == "opencode-go" else None
+            prepared.append((name, label, fetcher, token, workspace))
+    except Exception as exc:  # pragma: no cover - resolution is best effort
+        return [], ["credential resolution: %s" % type(exc).__name__]
+
+    try:
+        with ThreadPoolExecutor(max_workers=max(1, len(prepared))) as pool:
             results = list(
-                pool.map(lambda item: _run_adapter(*item, opener=opener), ADAPTERS)
+                pool.map(lambda item: _run_adapter(*item, opener=opener), prepared)
             )
     except Exception as exc:  # pragma: no cover - executor is best effort
         return [], ["adapters: %s" % type(exc).__name__]

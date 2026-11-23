@@ -46,9 +46,10 @@ Percentages default to the **Used** view and can be switched to **Free** from th
 
 ## Privacy
 
-Credentials are resolved in memory from the Hermes store (`agent.secret_scope`) and sent
-only to each provider's official host. They are never printed, persisted, or shared with
-third parties. The panel has no telemetry of its own.
+Credentials are resolved only through Hermes' secret resolver (`agent.secret_scope`) for
+the variables declared in `plugin.yaml` (`requires_env`) and sent solely to each provider's
+official host. No credential-store file, `.env` file, or other tool's login is read.
+Values are never printed or persisted, and the panel has no telemetry of its own.
 
 ## Tests
 

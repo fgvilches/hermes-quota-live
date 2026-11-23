@@ -29,7 +29,7 @@ que se consultan.
 
 El repo público es https://github.com/fgvilches/hermes-quota-live y el borrador del entry está en `docs/catalog-entry.yaml`, fijado al commit `<SHA_DEL_COMMIT_PUBLICADO>`. **No se abrió ningún PR**; se deja para revisión.
 
-Antes de submittear hay que resolver la regla 11 (credenciales): hoy el backend lee `~/.hermes/auth.json` para obtener los punteros `env:...` y usa `gh auth token` para Copilot. El camino conforme es declarar `requires_env` en `plugin.yaml` y usar únicamente `agent.secret_scope.get_secret()`, sin leer `auth.json` ni el login de otra CLI.
+Regla 11 resuelta: el backend declara `requires_env` en `plugin.yaml` y resuelve las credenciales únicamente con `agent.secret_scope.get_secret()`. No lee `auth.json`, `.env` ni el login de otras CLI.
 
 Referencias:
 - https://hermes-agent.nousresearch.com/docs/developer-guide/plugins/catalog-submission

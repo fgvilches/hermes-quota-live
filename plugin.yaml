@@ -9,3 +9,10 @@ repository: https://github.com/fgvilches/hermes-quota-live
 tags: [dashboard, quota, usage, desktop, opencode]
 requires_hermes: ">=0.23.0"
 platforms: []
+requires_env:
+  - GITHUB_TOKEN
+  - GLM_API_KEY
+  - OPENCODE_GO_API_KEY
+  - OPENROUTER_API_KEY
+optional_env:
+  - OPENCODE_WORKSPACE_ID
