@@ -4,6 +4,8 @@ Panel de **cuota real** dentro del desktop de Hermes, alimentado por las APIs of
 de los proveedores que ya usa Hermes.
 ![Panel Quota & Usage](docs/screenshots/panel-cuota.png)
 
+![Detalle de la vista Usado](docs/screenshots/vista-usado.png)
+
 ## qué muestra
 
 | Proveedor | Fuente |
