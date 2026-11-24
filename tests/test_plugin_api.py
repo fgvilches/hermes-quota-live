@@ -14,6 +14,7 @@ import sqlite3
 import sys
 import tempfile
 import time
+import types
 import unittest
 import urllib.error
 import urllib.parse
@@ -300,12 +301,12 @@ class QuotaBackendTests(unittest.TestCase):
         self.assertEqual(snap["source"], "hermes")
         self.assertFalse(snap["opencode"]["connected"])
         self.assertIn("URLError", snap["opencode"]["error"])
-        self.assertTrue(any("Inicie el plugin GUI" in note for note in snap["notes"]))
-        self.assertTrue(any(note.startswith("Uso/analítica") for note in snap["notes"]))
+        self.assertTrue(any("No quota cards" in note for note in snap["notes"]))
+        self.assertTrue(any(note.startswith("Usage/analytics") for note in snap["notes"]))
         cards = snap["quota"]["cards"]
         self.assertEqual([c["provider"] for c in cards], ["provider-a", "provider-b"])
         card = cards[0]
-        self.assertEqual(card["windows"][0]["status"], "sinfuente de cuota")
+        self.assertEqual(card["windows"][0]["status"], "no quota source")
         self.assertNotIn("used", card["windows"][0])
         self.assertNotIn("limit", card["windows"][0])
         self.assertFalse(card["active"])
@@ -352,7 +353,7 @@ class QuotaBackendTests(unittest.TestCase):
         self.assertEqual(snap["quota"]["cards"][0]["id"], "card-abc")
         self.assertEqual(snap["analytics"]["totalTokens"], 225)
         self.assertEqual(snap["models"][0]["model"], "model-a")
-        self.assertTrue(any(note.startswith("Uso/analítica") for note in snap["notes"]))
+        self.assertTrue(any(note.startswith("Usage/analytics") for note in snap["notes"]))
 
     def test_contract_shape(self):
         snap = api.build_snapshot("7d", force=True, opener=FakeOpener(full_responses()), db_path=self.db)
@@ -403,6 +404,43 @@ class QuotaBackendTests(unittest.TestCase):
             self.assertNotIn("SECRET_TEST_TOKEN_DO_NOT_LEAK", response.text)
             bad_range = self.client.get(PREFIX + "/snapshot?range=bogus")
             self.assertEqual(bad_range.json()["analytics"]["range"], "7d")
+
+
+class ProfileSecretScopeTests(unittest.TestCase):
+    """Plugin routes run outside a turn scope: credentials need a profile scope."""
+
+    def test_installs_profile_scope_when_none_is_active(self):
+        fake = types.SimpleNamespace()
+        fake.current_secret_scope = lambda: None
+        fake.build_profile_secret_scope = lambda home: {"PROBE": "value"}
+        installed, reset = [], []
+        fake.set_secret_scope = lambda mapping: installed.append(mapping) or "TOKEN"
+        fake.reset_secret_scope = reset.append
+        with patch.dict(sys.modules, {"agent": types.SimpleNamespace(), "agent.secret_scope": fake}):
+            result = api.call_with_profile_secrets(lambda: ("ok", 42))
+        self.assertEqual(result, ("ok", 42))
+        self.assertEqual(installed, [{"PROBE": "value"}])
+        self.assertEqual(reset, ["TOKEN"])
+
+    def test_existing_scope_is_not_replaced(self):
+        fake = types.SimpleNamespace()
+        fake.current_secret_scope = lambda: {"ALREADY": "scoped"}
+        fake.set_secret_scope = lambda mapping: self.fail("scope must not be replaced")
+        with patch.dict(sys.modules, {"agent": types.SimpleNamespace(), "agent.secret_scope": fake}):
+            result = api.call_with_profile_secrets(lambda: "ok")
+        self.assertEqual(result, "ok")
+
+    def test_opencode_probe_is_opt_in(self):
+        card = {"id": "probe", "provider": "probe", "label": "Probe", "active": True, "windows": []}
+        api.invalidate_cache()
+        with patch.object(api, "OQG_ENABLED", False), \
+             patch.object(api, "fetch_json", side_effect=AssertionError("OQG no debe consultarse")), \
+             patch.object(api, "call_with_profile_secrets", return_value=([card], [])):
+            snap = api.build_snapshot("7d", force=True)
+        self.assertFalse(snap["opencode"]["enabled"])
+        self.assertFalse(snap["opencode"]["connected"])
+        self.assertNotIn("error", snap["opencode"])
+        self.assertEqual(snap["source"], "mixed")
 
 
 if __name__ == "__main__":

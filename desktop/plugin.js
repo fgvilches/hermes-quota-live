@@ -20,12 +20,12 @@ const RANGES = [
   { id: '24h', label: '24 h' },
   { id: '7d', label: '7 d' },
   { id: '30d', label: '30 d' },
-  { id: 'lifetime', label: 'Todo' }
+  { id: 'lifetime', label: 'All' }
 ]
 const TABS = [
-  { id: 'quota', label: 'Cuota' },
-  { id: 'analytics', label: 'Análisis' },
-  { id: 'models', label: 'Modelos' },
+  { id: 'quota', label: 'Quota' },
+  { id: 'analytics', label: 'Analytics' },
+  { id: 'models', label: 'Models' },
   { id: 'about', label: 'Info' }
 ]
 
@@ -78,33 +78,33 @@ function pctUsed(window) {
 
 function statusOf(window) {
   const s = typeof window?.status === 'string' ? window.status.toLowerCase() : ''
-  if (/exhaust|deplet|limit|agot/.test(s)) return 'Agotado'
-  if (/low|warn|baj/.test(s)) return 'Bajo'
+  if (/exhaust|deplet|limit|agot/.test(s)) return 'Exhausted'
+  if (/low|warn|baj/.test(s)) return 'Low'
   const p = pctOf(window)
-  if (p === null) return 'Sin dato'
+  if (p === null) return 'No data'
   if (p <= 0) return 'Agotado'
-  if (p <= 20) return 'Bajo'
-  return 'Disponible'
+  if (p <= 20) return 'Low'
+  return 'Available'
 }
 
 function countdown(iso, now) {
   const t = Date.parse(iso)
   if (!Number.isFinite(t)) return ''
   const ms = t - now
-  if (ms <= 0) return 'ya venció'
+  if (ms <= 0) return 'expired'
   const mins = Math.floor(ms / 60000)
   const days = Math.floor(mins / 1440)
   const hours = Math.floor((mins % 1440) / 60)
   const minutes = mins % 60
-  if (days > 0) return `en ${days} d ${hours} h`
-  if (hours > 0) return `en ${hours} h ${minutes} min`
-  return `en ${minutes} min`
+  if (days > 0) return `in ${days} d ${hours} h`
+  if (hours > 0) return `in ${hours} h ${minutes} min`
+  return `in ${minutes} min`
 }
 
 function clock(iso) {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return '—'
-  return d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+  return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
 }
 
 /** Iniciales del proveedor, sin colores hardcoded. */
@@ -161,7 +161,7 @@ function RangePicker({ value, onChange }) {
     children: RANGES.map(r => jsx('button', {
       key: r.id,
       type: 'button',
-      title: `Rango: ${r.label}`,
+      title: `Range: ${r.label}`,
       onClick: () => onChange(r.id),
       className: cn(
         'rounded px-1.5 py-0.5 text-[0.625rem] transition-colors',
@@ -189,12 +189,12 @@ function WindowRow({ window, now, mode }) {
       jsxs('div', {
         className: 'mb-1 flex items-baseline justify-between gap-2 text-[0.6875rem]',
         children: [
-          jsx('span', { className: 'truncate', style: { color: 'var(--ui-text-secondary)' }, children: window.label || 'Ventana' }),
+          jsx('span', { className: 'truncate', style: { color: 'var(--ui-text-secondary)' }, children: window.label || 'Window' }),
           jsx('span', {
             className: 'shrink-0 font-semibold tabular-nums',
-            title: mode === 'used' ? 'Porcentaje usado' : 'Porcentaje libre',
+            title: mode === 'used' ? 'Used percentage' : 'Free percentage',
             style: { color: free !== null && free <= 20 ? 'var(--ui-accent)' : 'var(--ui-text-primary)' },
-            children: p === null ? '—' : `${Math.round(p)}% ${mode === 'used' ? 'usado' : 'libre'}`
+            children: p === null ? '—' : `${Math.round(p)}% ${mode === 'used' ? 'used' : 'free'}`
           })
         ]
       }),
@@ -222,17 +222,17 @@ function QuotaCard({ card, now, mode }) {
       jsxs('div', { className: 'flex items-start gap-2.5', children: [
         jsx(ProviderMark, { provider: card.provider }),
         jsxs('div', { className: 'min-w-0 flex-1', children: [
-          jsx('div', { className: 'truncate text-xs font-semibold', children: card.label || card.provider || 'Proveedor' }),
+          jsx('div', { className: 'truncate text-xs font-semibold', children: card.label || card.provider || 'Provider' }),
           jsxs('div', { className: 'mt-0.5 flex flex-wrap gap-x-2 text-[0.625rem]', style: { color: 'var(--ui-text-tertiary)' }, children: [
             card.account ? jsx('span', { children: card.account }) : null,
             card.plan ? jsx('span', { children: `· ${card.plan}` }) : null,
-            card.active === false ? jsx('span', { children: '· inactiva' }) : null
+            card.active === false ? jsx('span', { children: '· inactive' }) : null
           ] })
         ] })
       ] }),
       (card.windows || []).map(w => jsx(WindowRow, { key: w.id || w.label || 'window', window: w, now, mode })),
       !card.windows || card.windows.length === 0
-        ? jsx('div', { className: 'mt-2 text-[0.625rem]', style: { color: 'var(--ui-text-tertiary)' }, children: 'Sin ventanas informadas.' })
+        ? jsx('div', { className: 'mt-2 text-[0.625rem]', style: { color: 'var(--ui-text-tertiary)' }, children: 'No windows reported.' })
         : null,
       card.error ? jsx('div', {
         className: 'mt-2 rounded px-2 py-1 text-[0.625rem]',
@@ -254,7 +254,7 @@ function QuotaTab({ data, now, mode, onMode }) {
       jsxs('div', { className: 'inline-flex rounded-md p-0.5', style: { background: 'var(--ui-stroke-secondary)' }, children: [
         jsx('button', {
           type: 'button',
-          title: 'Mostrar cuánto se consumió de cada ventana',
+          title: 'Show how much was used in each window',
           onClick: () => onMode('used'),
           className: cn('rounded px-2 py-0.5 text-[0.625rem] transition-colors', mode === 'used' ? 'font-semibold' : ''),
           style: mode === 'used' ? { background: 'var(--ui-accent)', color: 'var(--ui-text-primary)' } : { color: 'var(--ui-text-tertiary)' },
@@ -262,25 +262,25 @@ function QuotaTab({ data, now, mode, onMode }) {
         }),
         jsx('button', {
           type: 'button',
-          title: 'Mostrar cuánto queda disponible en cada ventana',
+          title: 'Show how much is left in each window',
           onClick: () => onMode('free'),
           className: cn('rounded px-2 py-0.5 text-[0.625rem] transition-colors', mode === 'free' ? 'font-semibold' : ''),
           style: mode === 'free' ? { background: 'var(--ui-accent)', color: 'var(--ui-text-primary)' } : { color: 'var(--ui-text-tertiary)' },
-          children: 'Libre'
+          children: 'Free'
         })
       ] })
     ] }),
     noQuotaSource
       ? jsx(Empty, { children: jsxs('span', { children: [
-          'Sin fuente de cuota conectada. ',
+          'No quota source connected. ',
           opencodeDown && data.opencode.error
             ? `OpenCode: ${data.opencode.error}. `
-            : 'OpenCode no está disponible. ',
-          'Se muestra solo el uso local de Hermes (si hay datos).'
+            : 'OpenCode is unavailable. ',
+          'Showing only local Hermes usage (if available).'
         ] }) })
       : null,
     cards.length === 0
-      ? jsx(Empty, { children: 'Todavía no hay tarjetas de cuota. Las cuentas detectadas aparecerán acá cuando el backend las informe.' })
+      ? jsx(Empty, { children: 'No quota cards yet. Detected accounts will appear here once the backend reports them.' })
       : cards.map(card => jsx(QuotaCard, { key: card.id || card.provider || 'card', card, now, mode }))
   ] })
 }
@@ -296,7 +296,7 @@ function Stat({ label, value }) {
 
 function DailyChart({ daily }) {
   const rows = Array.isArray(daily) ? daily : []
-  if (rows.length === 0) return jsx(Empty, { children: 'Sin datos diarios para el rango elegido.' })
+  if (rows.length === 0) return jsx(Empty, { children: 'No daily data for the selected range.' })
   const max = Math.max(...rows.map(r => num(r.tokens)), 1)
   return jsxs('div', {
     className: 'flex h-24 items-end gap-1',
@@ -324,14 +324,14 @@ function AnalyticsTab({ data, range, onRange }) {
   const projects = Array.isArray(a.projects) ? a.projects : []
   const shownRange = a.range || range
   return jsxs('div', { className: 'flex flex-col gap-3', children: [
-    jsxs(SectionTitle, { right: jsx(RangePicker, { value: range, onChange: onRange }), children: `Análisis · ${shownRange}` }),
+    jsxs(SectionTitle, { right: jsx(RangePicker, { value: range, onChange: onRange }), children: `Analytics · ${shownRange}` }),
     jsxs('div', { className: 'flex gap-1.5', children: [
       jsx(Stat, { label: 'Tokens', value: a.totalTokens }),
       jsx(Stat, { label: 'Cache', value: a.cacheRead })
     ] }),
     jsxs('div', { className: 'flex gap-1.5', children: [
       jsx(Stat, { label: 'Input', value: a.input }),
-      jsx(Stat, { label: 'Razonamiento', value: a.reasoning }),
+      jsx(Stat, { label: 'Reasoning', value: a.reasoning }),
       jsx(Stat, { label: 'Output', value: a.output })
     ] }),
     jsx('div', {
@@ -339,17 +339,17 @@ function AnalyticsTab({ data, range, onRange }) {
       style: { borderColor: 'var(--ui-stroke-secondary)' },
       children: jsx(DailyChart, { daily: a.daily })
     }),
-    jsx(SectionTitle, { children: 'Proyectos' }),
+    jsx(SectionTitle, { children: 'Projects' }),
     projects.length === 0
-      ? jsx(Empty, { children: 'Sin proyectos con actividad en este rango.' })
+      ? jsx(Empty, { children: 'No projects with activity in this range.' })
       : projects.map(p => jsxs('div', {
           key: p.id || p.label,
           className: 'flex items-center justify-between gap-2 border-b py-1.5 text-[0.6875rem] last:border-b-0',
           style: { borderColor: 'var(--ui-stroke-secondary)' },
           children: [
             jsxs('span', { className: 'min-w-0 truncate', children: [
-              p.label || p.id || 'Proyecto',
-              p.sessions ? jsx('span', { style: { color: 'var(--ui-text-tertiary)' }, children: ` · ${p.sessions} sesiones` }) : null
+              p.label || p.id || 'Project',
+              p.sessions ? jsx('span', { style: { color: 'var(--ui-text-tertiary)' }, children: ` · ${p.sessions} sessions` }) : null
             ] }),
             jsx('span', { className: 'shrink-0 tabular-nums', style: { color: 'var(--ui-text-secondary)' }, children: fmt(p.tokens) })
           ]
@@ -362,9 +362,9 @@ function AnalyticsTab({ data, range, onRange }) {
 function ModelsTab({ data, range, onRange }) {
   const models = Array.isArray(data.models) ? data.models : []
   return jsxs('div', { className: 'flex flex-col gap-3', children: [
-    jsxs(SectionTitle, { right: jsx(RangePicker, { value: range, onChange: onRange }), children: 'Modelos' }),
+    jsxs(SectionTitle, { right: jsx(RangePicker, { value: range, onChange: onRange }), children: 'Models' }),
     models.length === 0
-      ? jsx(Empty, { children: 'Sin consumo de modelos registrado para este rango.' })
+      ? jsx(Empty, { children: 'No model usage recorded for this range.' })
       : jsxs('div', {
           className: 'overflow-hidden rounded-lg border',
           style: { borderColor: 'var(--ui-stroke-secondary)' },
@@ -372,7 +372,7 @@ function ModelsTab({ data, range, onRange }) {
             jsxs('div', {
               className: 'grid grid-cols-[1fr_3.2rem] gap-2 px-2 py-1.5 text-[0.5625rem] font-semibold uppercase tracking-wide',
               style: { color: 'var(--ui-text-tertiary)', borderBottom: '1px solid var(--ui-stroke-secondary)' },
-              children: [jsx('span', { children: 'Proveedor / modelo' }), jsx('span', { className: 'text-right', children: 'Tokens' })]
+              children: [jsx('span', { children: 'Provider / model' }), jsx('span', { className: 'text-right', children: 'Tokens' })]
             }),
             models.map((m, i) => jsxs('div', {
               key: `${m.provider || ''}:${m.model || ''}:${i}`,
@@ -380,12 +380,12 @@ function ModelsTab({ data, range, onRange }) {
               style: i % 2 ? { background: 'var(--ui-stroke-secondary)' } : undefined,
               children: [
                 jsxs('div', { className: 'min-w-0', children: [
-                  jsx('div', { className: 'truncate', children: m.model || 'Modelo' }),
+                  jsx('div', { className: 'truncate', children: m.model || 'Model' }),
                   jsx('div', { className: 'truncate text-[0.5625rem]', style: { color: 'var(--ui-text-tertiary)' }, children: m.provider || '' })
                 ] }),
                 jsx('div', {
                   className: 'text-right tabular-nums',
-                  title: `input ${fmt(m.input)} · output ${fmt(m.output)} · cache ${fmt(m.cacheRead)} · razonamiento ${fmt(m.reasoning)}`,
+                  title: `input ${fmt(m.input)} · output ${fmt(m.output)} · cache ${fmt(m.cacheRead)} · reasoning ${fmt(m.reasoning)}`,
                   children: fmt(m.tokens)
                 })
               ]
@@ -410,20 +410,20 @@ function InfoRow({ label, value }) {
 
 function AboutTab({ data, gateway }) {
   const notes = Array.isArray(data.notes) ? data.notes : []
-  const sourceLabel = { opencode: 'OpenCode', hermes: 'Hermes', mixed: 'Mixto' }[data.source] || String(data.source || '—')
+  const sourceLabel = { opencode: 'OpenCode', hermes: 'Hermes', mixed: 'Mixed' }[data.source] || String(data.source || '—')
   return jsxs('div', { className: 'flex flex-col gap-3', children: [
     jsxs('div', { children: [
-      jsx(SectionTitle, { children: 'Origen de datos' }),
-      jsx(InfoRow, { label: 'Fuente', value: sourceLabel }),
-      jsx(InfoRow, { label: 'OpenCode conectado', value: data.opencode?.connected ? 'sí' : 'no' }),
-      jsx(InfoRow, { label: 'Versión de OpenCode', value: data.opencode?.version }),
-      jsx(InfoRow, { label: 'Error de OpenCode', value: data.opencode?.error }),
-      jsx(InfoRow, { label: 'Gateway de Hermes', value: gateway || '—' }),
-      jsx(InfoRow, { label: 'Actualizado', value: data.generatedAt ? clock(data.generatedAt) : '—' })
+      jsx(SectionTitle, { children: 'Data source' }),
+      jsx(InfoRow, { label: 'Source', value: sourceLabel }),
+      jsx(InfoRow, { label: 'OpenCode connected', value: data.opencode?.connected ? 'yes' : 'no' }),
+      jsx(InfoRow, { label: 'OpenCode version', value: data.opencode?.version }),
+      jsx(InfoRow, { label: 'OpenCode error', value: data.opencode?.error }),
+      jsx(InfoRow, { label: 'Hermes gateway', value: gateway || '—' }),
+      jsx(InfoRow, { label: 'Updated', value: data.generatedAt ? clock(data.generatedAt) : '—' })
     ] }),
     notes.length > 0
       ? jsxs('div', { children: [
-          jsx(SectionTitle, { children: 'Notas del backend' }),
+          jsx(SectionTitle, { children: 'Backend notes' }),
           jsxs('ul', { className: 'flex flex-col gap-1 text-[0.6875rem] leading-relaxed', style: { color: 'var(--ui-text-secondary)' },
             children: notes.map((note, i) => jsx('li', { key: i, children: `• ${note}` })) })
         ] })
@@ -431,7 +431,7 @@ function AboutTab({ data, gateway }) {
     jsx('p', {
       className: 'text-[0.625rem] leading-relaxed',
       style: { color: 'var(--ui-text-tertiary)' },
-      children: 'Panel local: réplica de la UI de opencode-quota-gui dentro de Hermes Desktop. Sin servicios externos ni datos enviados a la nube.'
+      children: 'Local pane: a port of the opencode-quota-gui UI inside Hermes Desktop. No external services and no data sent to the cloud.'
     })
   ] })
 }
@@ -472,9 +472,9 @@ function QuotaPane({ ctx }) {
       haptic('tap')
     } catch (error) {
       if (typeof host.notifyError === 'function') {
-        host.notifyError(error, 'No se pudo actualizar la cuota')
+        host.notifyError(error, 'Could not refresh quota')
       } else {
-        host.notify({ kind: 'error', message: `No se pudo actualizar la cuota: ${error?.message || error}` })
+        host.notify({ kind: 'error', message: `Could not refresh quota: ${error?.message || error}` })
       }
     } finally {
       setBusy(false)
@@ -498,8 +498,8 @@ function QuotaPane({ ctx }) {
       }),
       jsx('button', {
         type: 'button',
-        title: 'Actualizar ahora',
-        'aria-label': 'Actualizar ahora',
+        title: 'Refresh now',
+        'aria-label': 'Refresh now',
         disabled: busy || Boolean(snap.isFetching),
         onClick: refresh,
         className: 'inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors hover:text-(--ui-accent) disabled:opacity-50',
@@ -511,23 +511,23 @@ function QuotaPane({ ctx }) {
       className: 'flex items-center justify-between gap-2 text-[0.625rem]',
       style: { color: 'var(--ui-text-tertiary)' },
       children: [
-        jsx('span', { children: snap.isFetching ? 'Actualizando…' : `Actualizado ${generatedAt}` }),
-        jsx('span', { children: `Fuente: ${data.source || '—'}` })
+        jsx('span', { children: snap.isFetching ? 'Refreshing…' : `Updated ${generatedAt}` }),
+        jsx('span', { children: `Source: ${data.source || '—'}` })
       ]
     }),
     snap.isError
       ? jsxs('div', { className: 'flex flex-col items-start gap-2 rounded-lg border p-3 text-xs', style: { borderColor: 'var(--ui-stroke-secondary)' }, children: [
-          jsx('div', { style: { color: 'var(--ui-text-secondary)' }, children: `No se pudo leer el snapshot: ${snap.error?.message || snap.error || 'error desconocido'}` }),
+          jsx('div', { style: { color: 'var(--ui-text-secondary)' }, children: `Could not read snapshot: ${snap.error?.message || snap.error || 'unknown error'}` }),
           jsx('button', {
             type: 'button',
             onClick: () => snap.refetch(),
             className: 'rounded px-2 py-1 text-[0.6875rem]',
             style: { color: 'var(--ui-accent)', border: '1px solid var(--ui-stroke-secondary)' },
-            children: 'Reintentar'
+            children: 'Retry'
           })
         ] })
       : snap.isLoading
-        ? jsx('div', { className: 'py-6 text-center text-xs', style: { color: 'var(--ui-text-tertiary)' }, children: 'Cargando cuota y uso…' })
+        ? jsx('div', { className: 'py-6 text-center text-xs', style: { color: 'var(--ui-text-tertiary)' }, children: 'Loading quota and usage…' })
         : tab === 'quota'
           ? jsx(QuotaTab, { data, now, mode: pctMode, onMode: setPctMode })
           : tab === 'analytics'
@@ -553,10 +553,10 @@ function QuotaChip({ ctx }) {
   const cards = Array.isArray(data.quota?.cards) ? data.quota.cards : []
   const values = cards.flatMap(c => Array.isArray(c.windows) ? c.windows.map(pctUsed) : []).filter(v => v !== null)
   const top = values.length ? Math.max(...values) : null
-  const label = top === null ? 'Uso —' : `Uso ${Math.round(top)}%`
+  const label = top === null ? 'Usage —' : `Usage ${Math.round(top)}%`
   const tip = top === null
-    ? `Sin datos de cuota (fuente: ${data.source || '—'}). Click para abrir Quota & Usage.`
-    : `Mayor consumo: ${Math.round(top)}% · ${cards.length} proveedor(es). Click para abrir Quota & Usage.`
+    ? `No quota data (source: ${data.source || '—'}). Click to open Quota & Usage.`
+    : `Highest use: ${Math.round(top)}% · ${cards.length} provider(s). Click to open Quota & Usage.`
 
   return jsx(Tip, { label: tip, children: jsx('button', {
     type: 'button',

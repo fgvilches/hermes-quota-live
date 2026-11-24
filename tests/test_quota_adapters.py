@@ -150,7 +150,7 @@ class DirectAdapterTests(unittest.TestCase):
     def test_zai_without_plan_is_reported_not_fabricated(self):
         card = qa.fetch_zai(SECRET, opener=opener_for({"quota/limit": {"success": False, "code": 500}}))
         self.assertEqual(card["windows"], [])
-        self.assertIn("sin plan", card["error"])
+        self.assertIn("no coding plan", card["error"])
         self.assertFalse(card["active"])
 
     def test_collect_direct_cards_is_sanitized(self):
@@ -180,7 +180,22 @@ class DirectAdapterTests(unittest.TestCase):
         )
         rendered = json.dumps({"cards": cards, "notes": notes})
         self.assertNotIn(SECRET, rendered)
-        self.assertTrue(any("Cuota directa" in note for note in notes))
+        self.assertTrue(any("Direct provider quota" in note for note in notes))
+
+
+class CredentialSourceTests(unittest.TestCase):
+    def test_copilot_uses_declared_secret_first(self):
+        with patch.object(qa, "_secret", side_effect=lambda n: SECRET if n == "GH_TOKEN" else None):
+            self.assertEqual(qa.credential("copilot"), SECRET)
+
+    def test_copilot_uses_github_token_second(self):
+        with patch.object(qa, "_secret", side_effect=lambda n: SECRET if n == "GITHUB_TOKEN" else None):
+            self.assertEqual(qa.credential("copilot"), SECRET)
+
+    def test_no_local_cli_fallback(self):
+        with patch.object(qa, "_secret", return_value=None):
+            self.assertIsNone(qa.credential("copilot"))
+            self.assertIsNone(qa.credential("zai"))
 
 
 if __name__ == "__main__":

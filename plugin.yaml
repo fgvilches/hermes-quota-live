@@ -1,7 +1,7 @@
 name: hermes-quota-live
 version: 0.1.0
 manifest_version: 2
-description: Cuota real de proveedores para Hermes Desktop, sin OpenCode Desktop
+description: Real provider quota inside Hermes Desktop, no OpenCode Desktop needed
 author: Felipe González
 license: MIT
 homepage: https://github.com/fgvilches/hermes-quota-live
@@ -9,10 +9,10 @@ repository: https://github.com/fgvilches/hermes-quota-live
 tags: [dashboard, quota, usage, desktop, opencode]
 requires_hermes: ">=0.23.0"
 platforms: []
-requires_env:
-  - GITHUB_TOKEN
+requires_env: []
+optional_env:
+  - GH_TOKEN
   - GLM_API_KEY
   - OPENCODE_GO_API_KEY
   - OPENROUTER_API_KEY
-optional_env:
   - OPENCODE_WORKSPACE_ID

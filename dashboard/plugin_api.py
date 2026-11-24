@@ -4,13 +4,15 @@ Mounted by Hermes at /api/plugins/hermes-quota/ (dashboard/manifest.json declare
 ``api: plugin_api.py`` and the module exposes a FastAPI ``router``).
 
 Sources, in priority order:
-  * opencode-quota-gui (OQG) on 127.0.0.1:4144 for real quota cards/analytics;
+  * direct provider APIs (OpenCode Go, OpenRouter, Z.ai) using the active
+    profile's secret scope — the primary source of real quota cards;
+  * opencode-quota-gui (OQG) on 127.0.0.1:4144, opt-in only (it requires
+    OpenCode >=2.0.16 and cannot serve real quota with older CLIs);
   * the active profile's ~/.hermes/state.db (read-only SQLite) for real usage
-    analytics/models whenever OQG is unavailable or partial.
+    analytics/models.
 
-No credentials are read, forwarded or logged. OQG calls are loopback-only,
-with a hard timeout below 2 seconds. Every number returned comes from one of
-those two sources; no value is fabricated.
+No credential value is read, forwarded or logged. Every number returned comes
+from one of those sources; no value is fabricated.
 """
 
 from __future__ import annotations
@@ -33,19 +35,23 @@ router = APIRouter()
 PLUGIN_ID = "hermes-quota"
 OQG_BASE_URL = "http://127.0.0.1:4144"
 OQG_TIMEOUT = 1.5  # hard ceiling: never block the renderer for more than 2s
+# The upstream GUI needs OpenCode >=2.0.16. Without it, 4144 can never return
+# real quota; probing it on every refresh only produces URLError noise in the
+# panel. Enable explicitly with HERMES_QUOTA_OQG=1 when that server is real.
+OQG_ENABLED = os.environ.get("HERMES_QUOTA_OQG", "").strip().lower() in {"1", "true", "yes"}
 CACHE_TTL_SECONDS = 5.0
 RANGE_KEYS = ("24h", "7d", "30d", "lifetime")
 RANGE_SECONDS = {"24h": 86400, "7d": 7 * 86400, "30d": 30 * 86400, "lifetime": None}
 
 NO_QUOTA_NOTE = (
-    "Sin fuente de cuota: opencode-quota-gui no responde en 127.0.0.1:4144. "
-    "Inicie el plugin GUI de OpenCode (o `opencode-quota-gui`) para ver ventanas "
-    "de cuota reales; el uso y la analítica mostrados vienen de ~/.hermes/state.db."
+    "No quota cards: no provider credentials were resolved. "
+    "Check `requires_env` in plugin.yaml; usage and analytics shown "
+    "come from ~/.hermes/state.db."
 )
-DB_NOTE = "Uso/analítica leídos de ~/.hermes/state.db (datos reales de sesiones locales)."
-CACHE_WRITE_NOTE = "totalTokens incluye cache_write_tokens; el contrato no expone esa categoría por separado."
-UTC_NOTE = "Las fechas daily están agrupadas en UTC."
-NO_API_EQUIV_NOTE = "apiEquivalent no disponible sin el motor de precios de opencode-quota-gui."
+DB_NOTE = "Usage/analytics read from ~/.hermes/state.db (real local session data)."
+CACHE_WRITE_NOTE = "totalTokens includes cache_write_tokens; the contract does not expose that category separately."
+UTC_NOTE = "Daily dates are grouped in UTC."
+NO_API_EQUIV_NOTE = "apiEquivalent unavailable without the opencode-quota-gui pricing engine."
 
 #: Test seam. When set, this callable replaces urllib.request.urlopen.
 DEFAULT_OPENER: Optional[Callable[..., Any]] = None
@@ -106,11 +112,51 @@ def _err_text(exc: BaseException) -> str:
 
 
 def hermes_home() -> Path:
-    return Path(os.environ.get("HERMES_HOME") or (Path.home() / ".hermes"))
+    """Follow the active Hermes profile, not the process launch environment."""
+    try:
+        from hermes_constants import get_hermes_home
+        return Path(get_hermes_home())
+    except ImportError:  # isolated unit tests outside the Hermes runtime
+        return Path(os.environ.get("HERMES_HOME") or (Path.home() / ".hermes"))
 
 
 def state_db_path() -> Path:
     return hermes_home() / "state.db"
+
+
+def call_with_profile_secrets(callback: Callable[[], Tuple[List[Dict[str, Any]], List[str]]]) -> Tuple[List[Dict[str, Any]], List[str]]:
+    """Run a credential-reading callback under the active profile's secret scope.
+
+    Plugin API routes are served outside a conversation turn, so no per-turn
+    scope is installed and ``get_secret`` would only see ``os.environ`` (the
+    profile's ``.env`` keys are not there). Install the profile's own scope for
+    the duration of the call and restore it afterwards. No credential file is
+    read here: the scope builder is Hermes' own, profile-aware API.
+    """
+    try:
+        from agent.secret_scope import (
+            build_profile_secret_scope,
+            current_secret_scope,
+            reset_secret_scope,
+            set_secret_scope,
+        )
+    except Exception:  # runtime without the scope module (e.g. isolated tests)
+        return callback()
+    if current_secret_scope() is not None:
+        return callback()
+    token = None
+    try:
+        token = set_secret_scope(build_profile_secret_scope(hermes_home()))
+    except Exception:
+        token = None
+    try:
+        return callback()
+    finally:
+        if token is not None:
+            try:
+                reset_secret_scope(token)
+            except Exception:
+                pass
 
 
 def invalidate_cache() -> None:
@@ -367,7 +413,7 @@ def read_hermes_usage(
     notes: List[str] = []
     path = Path(db_path) if db_path is not None else state_db_path()
     if not path.is_file():
-        return analytics, [], _degraded_cards([]), ["No se encontró %s; analítica vacía." % path]
+        return analytics, [], _degraded_cards([]), ["%s not found; empty analytics." % path]
     now_s = time.time() if now_s is None else now_s
     window = RANGE_SECONDS[range_key]
     since_s = None if window is None else now_s - window
@@ -387,7 +433,7 @@ def read_hermes_usage(
         finally:
             conn.close()
     except Exception as exc:
-        return analytics, [], _degraded_cards([]), ["state.db ilegible (%s); analítica vacía." % _err_text(exc)]
+        return analytics, [], _degraded_cards([]), ["state.db unreadable (%s); empty analytics." % _err_text(exc)]
 
     day_tokens: Dict[str, float] = {}
     models: Dict[Tuple[str, str], Dict[str, Any]] = {}
@@ -468,9 +514,9 @@ def _degraded_cards(providers: List[str]) -> List[Dict[str, Any]]:
     return [{
         "id": "hermes-noquota-%d" % index,
         "provider": provider,
-        "label": "%s — sin fuente de cuota" % provider,
+        "label": "%s — no quota source" % provider,
         "active": False,
-        "windows": [{"id": "sinfuente", "label": "Cuota", "status": "sinfuente de cuota"}],
+        "windows": [{"id": "sinfuente", "label": "Quota", "status": "no quota source"}],
     } for index, provider in enumerate(names)]
 
 
@@ -494,11 +540,18 @@ def build_snapshot(
         return _CACHE["data"]
 
     errors: List[str] = []
-    kwargs = {"base_url": base_url, "timeout": min(float(timeout), 2.0), "opener": opener}
-    health, health_error = fetch_json("/api/v1/health", **kwargs)
-    quota, quota_error = fetch_json("/api/v1/quota", **kwargs)
-    home, home_error = fetch_json("/api/v1/home", {"range": range_key}, **kwargs)
-    models_payload, models_error = fetch_json("/api/v1/models", {"range": range_key}, **kwargs)
+    # Production skips the dead loopback GUI: an injected opener (tests) or an
+    # explicit opt-in is the only reason to dial 127.0.0.1:4144.
+    probe_opencode = bool(base_url) and (opener is not None or DEFAULT_OPENER is not None or OQG_ENABLED)
+    if probe_opencode:
+        kwargs = {"base_url": base_url, "timeout": min(float(timeout), 2.0), "opener": opener}
+        health, health_error = fetch_json("/api/v1/health", **kwargs)
+        quota, quota_error = fetch_json("/api/v1/quota", **kwargs)
+        home, home_error = fetch_json("/api/v1/home", {"range": range_key}, **kwargs)
+        models_payload, models_error = fetch_json("/api/v1/models", {"range": range_key}, **kwargs)
+    else:
+        health = quota = home = models_payload = None
+        health_error = quota_error = home_error = models_error = None
     for error in (health_error, quota_error, home_error, models_error):
         if error:
             errors.append(error)
@@ -512,7 +565,7 @@ def build_snapshot(
     else:
         source = "hermes"
 
-    opencode: Dict[str, Any] = {"connected": connected}
+    opencode: Dict[str, Any] = {"connected": connected, "enabled": probe_opencode}
     if version:
         opencode["version"] = version
     if errors:
@@ -528,9 +581,9 @@ def build_snapshot(
                 import sys
                 sys.path.insert(0, str(Path(__file__).resolve().parent))
                 from quota_adapters import collect_direct_cards
-            direct_cards, direct_notes = collect_direct_cards()
+            direct_cards, direct_notes = call_with_profile_secrets(collect_direct_cards)
         except Exception as exc:
-            direct_cards, direct_notes = [], ["Cuota directa: %s" % type(exc).__name__]
+            direct_cards, direct_notes = [], ["Direct quota: %s" % type(exc).__name__]
     else:  # offline tests inject their own opener; never call live provider APIs
         direct_cards, direct_notes = [], []
 

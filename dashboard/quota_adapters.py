@@ -261,7 +261,7 @@ def fetch_openrouter(token: str, opener: Optional[Opener] = None) -> Dict[str, A
             windows.append(
                 _window(
                     "key_limit",
-                    "Límite de clave",
+                    "Key limit",
                     used=used if used is not None else limit - remaining,
                     limit=limit,
                     remaining_pct=100.0 * remaining / limit,
@@ -275,7 +275,7 @@ def fetch_openrouter(token: str, opener: Optional[Opener] = None) -> Dict[str, A
         windows.append(
             _window(
                 "free_daily_requests",
-                "Modelos free · requests/día",
+                "Free models · requests/day",
                 used=used,
                 limit=limit,
                 remaining_pct=100.0 * (limit - used) / limit,
@@ -330,7 +330,7 @@ def fetch_zai(token: str, opener: Optional[Opener] = None) -> Dict[str, Any]:
             opener=opener,
         )
         if payload.get("success") is False or _num(payload.get("code")) not in (None, 0):
-            error = "sin plan de coding en la clave guardada"
+            error = "no coding plan on the saved key"
         else:
             data = payload.get("data")
             limits = data.get("limits") if isinstance(data, Mapping) else payload.get("limits")
@@ -343,7 +343,7 @@ def fetch_zai(token: str, opener: Optional[Opener] = None) -> Dict[str, Any]:
                 windows.append(
                     _window(
                         "limit_%s" % (entry.get("type") or len(windows)),
-                        _text(entry.get("type")) or "Límite",
+                        _text(entry.get("type")) or "Limit",
                         used=used,
                         limit=100,
                         remaining_pct=100 - used,
@@ -353,7 +353,7 @@ def fetch_zai(token: str, opener: Optional[Opener] = None) -> Dict[str, Any]:
                     )
                 )
     except Exception:
-        error = "no se pudo consultar el plan"
+        error = "could not query the plan"
     return _card("zai", "Z.ai GLM", windows, error=error, active=not error)
 
 
@@ -413,5 +413,5 @@ def collect_direct_cards(opener: Optional[Opener] = None) -> Tuple[List[Dict[str
     notes = [note for _, note in results if note]
     if cards:
         labels = ", ".join(str(card.get("label")) for card in cards)
-        notes.insert(0, "Cuota directa de proveedores: %s." % labels)
+        notes.insert(0, "Direct provider quota: %s." % labels)
     return cards, notes
